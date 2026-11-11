@@ -1,0 +1,63 @@
+name: pmng
+
+services:
+  pmng-persistance:
+    image: mysql:8.0
+    container_name: pmng-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: pmng_root
+      MYSQL_DATABASE: people-dev
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - pmng-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-ppmng_root"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s
+    networks:
+      pmng-net:
+        aliases:
+          - pmng-mysql
+
+  pmng-servicios:
+    image: backend:v1.0
+    build: ./service
+    container_name: pmng-back
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://pmng-mysql:3306/people-dev?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=America/Mexico_City&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: pmng_root
+    ports:
+      - "8089:8080"
+    depends_on:
+      pmng-persistance:
+        condition: service_healthy
+    networks:
+      pmng-net:
+        aliases:
+          - pmng-back
+
+  pmng-cliente:
+    image: frontend:v1.0
+    build: ./client
+    container_name: pmng-cliente
+    ports:
+      - "5173:80"
+    depends_on:
+      - pmng-servicios
+    networks:
+      - pmng-net
+
+networks:
+  pmng-net:
+    name: pmng-net
+    driver: bridge
+
+volumes:
+  pmng-mysql-data:
